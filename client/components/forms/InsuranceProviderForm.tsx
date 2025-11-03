@@ -6,11 +6,11 @@ import {
   GenericFormJSXType,
 } from "@/typescript/types";
 import { Form } from "antd";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { TextInputStyled, NumberInputStyled } from "../common/commonInputs";
 import { UserIcon, PercentIcon } from "@/client/icons/icons";
-import { FirestoreService } from "@/client/services/firestore.service";
-import { COLLECTIONS } from "@/typescript/types";
+import { InsuranceProviderService } from "@/client/services/insuranceProvider.service";
+import { validateInsuranceProvider } from "@/client/utils/validation.utils";
 import { useDispatch } from "react-redux";
 import {
   addInsuranceProvider,
@@ -22,17 +22,36 @@ const InsuranceProviderForm = (
   props: GenericFormJSXType<InsuranceProviderFormType, InsuranceProviderType>
 ) => {
   const dispatch = useDispatch();
+  const [loading, setLoading] = useState(false);
 
   const handleSaveProvider = async (values: InsuranceProviderType) => {
     try {
+      setLoading(true);
+
+      // Include id in validation data for Edit mode
+      const validationData = props.data.mode === "Edit" && props.data.insuranceProvider?.id
+        ? { ...values, id: props.data.insuranceProvider.id }
+        : values;
+
+      // Validate data
+      const validation = validateInsuranceProvider(validationData, props.data.mode);
+      if (!validation.isValid) {
+        // Display first validation error
+        const firstError = Object.values(validation.errors)[0];
+        toast.error(firstError);
+        setLoading(false);
+        return;
+      }
+
       if (props.data.mode === "Edit" && props.data.insuranceProvider?.id) {
-        const result = await FirestoreService.update(
-          COLLECTIONS.INSURANCE_PROVIDERS,
+        // Update existing provider
+        const result = await InsuranceProviderService.update(
           props.data.insuranceProvider.id,
           values
         );
+        
         if (result.success) {
-          toast.success("Insurance Provider updated successfully");
+          toast.success(result.message || "Insurance provider updated successfully");
           dispatch(
             updateInsuranceProvider({
               ...values,
@@ -45,15 +64,11 @@ const InsuranceProviderForm = (
           toast.error(result.error || "Failed to update insurance provider");
         }
       } else {
-        const result = await FirestoreService.create(
-          COLLECTIONS.INSURANCE_PROVIDERS,
-          {
-            ...values,
-            isActive: true,
-          }
-        );
+        // Create new provider
+        const result = await InsuranceProviderService.create(values);
+        
         if (result.success) {
-          toast.success("Insurance Provider created successfully");
+          toast.success(result.message || "Insurance provider created successfully");
           dispatch(addInsuranceProvider(result.data as InsuranceProviderType));
           props.form.resetFields();
           if (props.onClose) props.onClose();
@@ -62,7 +77,10 @@ const InsuranceProviderForm = (
         }
       }
     } catch (error: any) {
+      console.error("Error saving insurance provider:", error);
       toast.error(error.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,14 +99,20 @@ const InsuranceProviderForm = (
         <TextInputStyled
           label="Provider Name"
           name="name"
+          className="md:col-span-2"
           rules={[
             {
               required: true,
               message: "Please enter provider name",
             },
+            {
+              pattern: /^[^${};<>`]+$/,
+              message: "Provider name should not contain symbols like '$', '}', '{', ';', '<', '>', '`'",
+            },
           ]}
-          placeholder="Provider name..."
+          placeholder="Enter provider name..."
           prefix={<UserIcon />}
+          disabled={loading}
         />
         <NumberInputStyled
           label="Agent Rate (%)"
@@ -102,9 +126,16 @@ const InsuranceProviderForm = (
               required: true,
               message: "Please enter agent rate",
             },
+            {
+              type: "number",
+              min: 0,
+              max: 100,
+              message: "Agent rate must be between 0 and 100",
+            },
           ]}
-          placeholder="Agent rate..."
+          placeholder="Enter agent rate..."
           prefix={<PercentIcon />}
+          disabled={loading}
         />
         <NumberInputStyled
           label="Our Rate (%)"
@@ -118,12 +149,19 @@ const InsuranceProviderForm = (
               required: true,
               message: "Please enter our rate",
             },
+            {
+              type: "number",
+              min: 0,
+              max: 100,
+              message: "Our rate must be between 0 and 100",
+            },
           ]}
-          placeholder="Our rate..."
+          placeholder="Enter our rate..."
           prefix={<PercentIcon />}
+          disabled={loading}
         />
         <NumberInputStyled
-          label="TDS (%)"
+          label="TDS Rate (%)"
           name="tds"
           type="number"
           min={0}
@@ -134,12 +172,19 @@ const InsuranceProviderForm = (
               required: true,
               message: "Please enter TDS rate",
             },
+            {
+              type: "number",
+              min: 0,
+              max: 100,
+              message: "TDS rate must be between 0 and 100",
+            },
           ]}
-          placeholder="TDS rate..."
+          placeholder="Enter TDS rate..."
           prefix={<PercentIcon />}
+          disabled={loading}
         />
         <NumberInputStyled
-          label="GST (%)"
+          label="GST Rate (%)"
           name="gst"
           type="number"
           min={0}
@@ -150,9 +195,16 @@ const InsuranceProviderForm = (
               required: true,
               message: "Please enter GST rate",
             },
+            {
+              type: "number",
+              min: 0,
+              max: 100,
+              message: "GST rate must be between 0 and 100",
+            },
           ]}
-          placeholder="GST rate..."
+          placeholder="Enter GST rate..."
           prefix={<PercentIcon />}
+          disabled={loading}
         />
       </div>
     </Form>

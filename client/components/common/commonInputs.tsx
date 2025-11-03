@@ -36,6 +36,7 @@ type InputProps<T> = {
   placeholder?: string;
   type?: "text" | "number";
   disabled?: boolean;
+  maxLength?: number;
 } & (
   | { type?: "text" }
   | {
@@ -74,6 +75,7 @@ export const TextInputStyled = (
         prefix={props.prefix}
         disabled={props.disabled}
         style={props.style}
+        maxLength={props.maxLength}
       />
     </Form.Item>
   );

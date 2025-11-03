@@ -37,22 +37,22 @@ export default function AntdThemeProvider({
           colorInfo: "#93674d", // brand-500
           colorLink: "#93674d", // brand-500
           colorLinkHover: "#7a5a42", // brand-600
-          colorBgBase: isDark ? "#1a1f26" : "#ffffff",
+          colorBgBase: isDark ? "#1a1a1a" : "#ffffff",
           borderRadius: 6,
           fontFamily: "inherit",
         },
         components: {
           Button: {
             primaryColor: "#ffffff",
-            defaultBorderColor: isDark ? "#3d444d" : "#d1d5db",
-            defaultColor: isDark ? "#e5e7eb" : "#4a362b",
+            defaultBorderColor: isDark ? "#333333" : "#d1d5db",
+            defaultColor: isDark ? "#f5f5f5" : "#4a362b",
           },
           Input: {
             activeBorderColor: "#93674d", // brand-500
-            hoverBorderColor: "#bfa491", // brand-300
+            hoverBorderColor: "#a98670", // brand-400
           },
           Select: {
-            optionSelectedBg: isDark ? "#2d333b" : "#e8ddd5",
+            optionSelectedBg: isDark ? "#1f1f1f" : "#e8ddd5",
           },
         },
       }}

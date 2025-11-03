@@ -17,11 +17,12 @@ import {
   FileTextOutlined,
   ArrowLeftOutlined,
   EyeOutlined,
+  CarOutlined,
 } from "@ant-design/icons";
-import { PolicyHoldersType, AgentType } from "@/typescript/types";
+import { PolicyHoldersType, VehicleType } from "@/typescript/types";
 import { useRouter } from "next/navigation";
 import dayjs, { Dayjs } from "dayjs";
-import { AgentService } from "@/client/services/agent.service";
+import { VehicleClassService } from "@/client/services/vehicleClass.service";
 import { toast } from "@/lib/toaster";
 import { capitalize } from "lodash";
 
@@ -32,19 +33,20 @@ type SummaryType = {
   agentCommission: number;
   profitAfterTDS: number;
   tdsAmount: number;
+  gstAmount: number;
   commission: number;
   grossAmount: number;
   premiumAmount: number;
   totalCommission: number;
 };
 
-export default function AgentCommissionsPage({
+export default function VehicleClassTransactionsPage({
   params,
 }: {
   params: { id: string };
 }) {
   const router = useRouter();
-  const [agent, setAgent] = useState<AgentType | null>(null);
+  const [vehicleClass, setVehicleClass] = useState<VehicleType | null>(null);
   const [transactions, setTransactions] = useState<PolicyHoldersType[]>([]);
   const [loading, setLoading] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -53,6 +55,7 @@ export default function AgentCommissionsPage({
     agentCommission: 0,
     profitAfterTDS: 0,
     tdsAmount: 0,
+    gstAmount: 0,
     commission: 0,
     grossAmount: 0,
     premiumAmount: 0,
@@ -66,7 +69,7 @@ export default function AgentCommissionsPage({
   ]);
 
   useEffect(() => {
-    loadAgentDetails();
+    loadVehicleClassDetails();
   }, [params.id]);
 
   useEffect(() => {
@@ -75,23 +78,23 @@ export default function AgentCommissionsPage({
     }
   }, [params.id, dateRange]);
 
-  const loadAgentDetails = async () => {
+  const loadVehicleClassDetails = async () => {
     try {
-      const result = await AgentService.getAgentById(params.id);
+      const result = await VehicleClassService.getVehicleClassById(params.id);
       if (result.success) {
-        setAgent(result.data as AgentType);
+        setVehicleClass(result.data as VehicleType);
       } else {
-        toast.error("Failed to load agent details", result.error || "");
+        toast.error(result.error || "Failed to load vehicle class details");
       }
     } catch (error: any) {
-      toast.error("Error", error.message);
+      toast.error(error.message);
     }
   };
 
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const result = await AgentService.getAgentTransactions(
+      const result = await VehicleClassService.getVehicleClassTransactions(
         params.id,
         dateRange[0].toISOString(),
         dateRange[1].toISOString()
@@ -105,17 +108,18 @@ export default function AgentCommissionsPage({
           agentCommission: 0,
           profitAfterTDS: 0,
           tdsAmount: 0,
+          gstAmount: 0,
           commission: 0,
           grossAmount: 0,
           premiumAmount: 0,
           totalCommission: 0,
         });
       } else {
-        toast.error("Failed to load transactions", result.error || "");
+        toast.error(result.error || "Failed to load transactions");
       }
     } catch (error: any) {
-      console.error("Error loading agent transactions:", error);
-      toast.error("Error", error.message);
+      console.error("Error loading vehicle class transactions:", error);
+      toast.error(error.message);
     } finally {
       setLoading(false);
     }
@@ -200,6 +204,29 @@ export default function AgentCommissionsPage({
       },
     },
     {
+      title: "GST%",
+      dataIndex: "gstRate",
+      key: "gstRate",
+      width: 60,
+      align: "center" as const,
+      render: (rate: number) => <span className="text-xs font-medium text-purple-600">{rate}%</span>,
+    },
+    {
+      title: "GST",
+      key: "gstAmount",
+      width: 80,
+      align: "right" as const,
+      render: (_: any, record: PolicyHoldersType) => {
+        const commission = (record.premiumAmount * record.totalCommission) / 100;
+        const gst = commission * (record.gstRate / 100);
+        return (
+          <span className="text-purple-600 text-xs">
+            ₹{(gst/1000).toFixed(1)}K
+          </span>
+        );
+      },
+    },
+    {
       title: "Ag%",
       dataIndex: "agentRate",
       key: "agentRate",
@@ -233,7 +260,7 @@ export default function AgentCommissionsPage({
         const agentCommission = (record.premiumAmount * record.agentRate) / 100;
         const ourProfit = profitAfterTDS - agentCommission;
         return (
-          <span className={`font-semibold text-xs ${ourProfit >= 0 ? "text-purple-600" : "text-red-600"}`}>
+          <span className={`font-semibold text-xs ${ourProfit >= 0 ? "text-indigo-600" : "text-red-600"}`}>
             ₹{(ourProfit/1000).toFixed(1)}K
           </span>
         );
@@ -265,35 +292,43 @@ export default function AgentCommissionsPage({
       <div className="mb-6">
         <Button
           icon={<ArrowLeftOutlined />}
-          onClick={() => router.push("/agents")}
+          onClick={() => router.push("/vehicle-classes")}
           size="large"
           className="mb-4"
         >
-          Back to Agents
+          Back to Vehicle Classes
         </Button>
         
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800">
-            {agent?.name || "Agent"} - Commission Report
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 flex items-center gap-2">
+            <CarOutlined />
+            {vehicleClass?.name ? capitalize(vehicleClass.name) : "Vehicle Class"} - Transaction Report
           </h1>
           <p className="text-gray-600 mt-1">
-            Detailed commission breakdown and transaction history
+            Detailed transaction breakdown and policy history
           </p>
         </div>
       </div>
 
-      {/* Agent Details Card */}
-      {agent && (
-        <Card title="Agent Information" className="shadow-sm mb-6">
-          <Descriptions column={{ xs: 1, sm: 2, md: 3 }} size="small">
-            <Descriptions.Item label="Name">{capitalize(agent.name)}</Descriptions.Item>
-            <Descriptions.Item label="Phone">{agent.phoneNumber}</Descriptions.Item>
-            <Descriptions.Item label="Email">{agent.email || "-"}</Descriptions.Item>
-            <Descriptions.Item label="City">{capitalize(agent.location?.city) || "-"}</Descriptions.Item>
-            <Descriptions.Item label="State">{capitalize(agent.location?.state) || "-"}</Descriptions.Item>
+      {/* Vehicle Class Details Card */}
+      {vehicleClass && (
+        <Card title="Vehicle Class Information" className="shadow-sm mb-6">
+          <Descriptions column={{ xs: 1, sm: 2, md: 4 }} size="small">
+            <Descriptions.Item label="Vehicle Class Name">
+              <span className="capitalize">{vehicleClass.name}</span>
+            </Descriptions.Item>
+            <Descriptions.Item label="Commission Rate">
+              <Tag color="blue">{vehicleClass.commissionRate}%</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Agent Rate">
+              <Tag color="green">{vehicleClass.agentRate}%</Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Our Rate">
+              <Tag color="purple">{vehicleClass.ourRate}%</Tag>
+            </Descriptions.Item>
             <Descriptions.Item label="Status">
-              <Tag color={agent.isActive ? "success" : "error"}>
-                {agent.isActive ? "Active" : "Inactive"}
+              <Tag color={vehicleClass.isActive ? "success" : "error"}>
+                {vehicleClass.isActive ? "Active" : "Inactive"}
               </Tag>
             </Descriptions.Item>
           </Descriptions>
@@ -367,11 +402,22 @@ export default function AgentCommissionsPage({
           <Col xs={24} sm={12} lg={6}>
             <Card bordered={false} className="shadow-sm">
               <Statistic
-                title="Commission After TDS"
-                value={summary.profitAfterTDS}
+                title="GST Amount"
+                value={summary.gstAmount}
                 prefix="₹"
                 precision={2}
-                valueStyle={{ color: "#52c41a", fontSize: "20px" }}
+                valueStyle={{ color: "#722ed1", fontSize: "20px" }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} lg={6}>
+            <Card bordered={false} className="shadow-sm">
+              <Statistic
+                title="Gross Amount"
+                value={summary.grossAmount}
+                prefix="₹"
+                precision={2}
+                valueStyle={{ color: "#13c2c2", fontSize: "20px" }}
               />
             </Card>
           </Col>
@@ -400,17 +446,6 @@ export default function AgentCommissionsPage({
               />
             </Card>
           </Col>
-          <Col xs={24} sm={12} lg={6}>
-            <Card bordered={false} className="shadow-sm">
-              <Statistic
-                title="Avg Commission/Policy"
-                value={transactions.length > 0 ? summary.agentCommission / transactions.length : 0}
-                prefix="₹"
-                precision={2}
-                valueStyle={{ color: "#13c2c2", fontSize: "20px" }}
-              />
-            </Card>
-          </Col>
         </Row>
       </div>
 
@@ -425,7 +460,7 @@ export default function AgentCommissionsPage({
         >
           View Transaction Details ({transactions.length} Policies)
         </Button>
-        </div>
+      </div>
 
       {/* Transactions Drawer */}
       <Drawer
@@ -449,7 +484,7 @@ export default function AgentCommissionsPage({
               pageSizeOptions: ["10", "20", "50"],
               style: { padding: "0 16px 16px 16px" }
             }}
-            scroll={{ x: 1000 }}
+            scroll={{ x: 1200 }}
             size="small"
             bordered
             summary={() => (
@@ -482,16 +517,24 @@ export default function AgentCommissionsPage({
                   <span className="text-xs">-</span>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={8} align="right">
+                  <span className="font-bold text-purple-600 text-xs">
+                    ₹{(summary.gstAmount/1000).toFixed(1)}K
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={9} align="center">
+                  <span className="text-xs">-</span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={10} align="right">
                   <span className="font-bold text-green-600 text-xs">
                     ₹{(summary.agentCommission/1000).toFixed(1)}K
                   </span>
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={9} align="right">
-                  <span className={`font-bold text-xs ${summary.ourProfit >= 0 ? "text-purple-600" : "text-red-600"}`}>
+                <Table.Summary.Cell index={11} align="right">
+                  <span className={`font-bold text-xs ${summary.ourProfit >= 0 ? "text-indigo-600" : "text-red-600"}`}>
                     ₹{(summary.ourProfit/1000).toFixed(1)}K
                   </span>
                 </Table.Summary.Cell>
-                <Table.Summary.Cell index={10} colSpan={2}>
+                <Table.Summary.Cell index={12} colSpan={2}>
                   <span className="text-xs">-</span>
                 </Table.Summary.Cell>
               </Table.Summary.Row>
@@ -502,5 +545,4 @@ export default function AgentCommissionsPage({
     </div>
   );
 }
-
 

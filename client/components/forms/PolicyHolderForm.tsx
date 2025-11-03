@@ -9,11 +9,10 @@ import {
   PolicyIcon,
   UserIcon,
 } from "@/client/icons/icons";
-import { FirestoreService } from "@/client/services/firestore.service";
+import { PolicyHolderService } from "@/client/services/policyHolder.service";
 import { addPolicy, updatePolicy } from "@/lib/redux/slices/policySlice";
 import {
   AgentType,
-  COLLECTIONS,
   GenericFormJSXType,
   InsuranceProviderType,
   PolicyFormDrawerType,
@@ -32,6 +31,10 @@ import {
 } from "../common/commonInputs";
 import { Heading } from "../common/commonViews";
 import { toast } from "@/lib/toaster";
+import { AgentService } from "@/client/services/agent.service";
+import { InsuranceProviderService } from "@/client/services/insuranceProvider.service";
+import { VehicleClassService } from "@/client/services/vehicleClass.service";
+import { validatePolicyHolder } from "@/client/utils/validation.utils";
 
 const PolicyHolderForm = (
   props: GenericFormJSXType<PolicyFormDrawerType, PolicyHoldersType>
@@ -48,19 +51,24 @@ const PolicyHolderForm = (
 
   const loadData = async () => {
     setLoading(true);
-    const [agentsRes, providersRes, vehiclesRes] = await Promise.all([
-      FirestoreService.getAll(COLLECTIONS.AGENTS),
-      FirestoreService.getAll(COLLECTIONS.INSURANCE_PROVIDERS),
-      FirestoreService.getAll(COLLECTIONS.VEHICLE_CLASSES),
-    ]);
+    try {
+      const [agentsRes, providersRes, vehiclesRes] = await Promise.all([
+        AgentService.getAllAgents({ limit: 1000 }),
+        InsuranceProviderService.getAll({ limit: 1000 }),
+        VehicleClassService.getAllVehicleClasses({ limit: 1000 }),
+      ]);
 
-    if (agentsRes.success) setAgents(agentsRes.data as AgentType[]);
-    if (providersRes.success)
-      setProviders(providersRes.data as InsuranceProviderType[]);
-    if (vehiclesRes.success)
-      setVehicleClasses(vehiclesRes.data as VehicleType[]);
-
-    setLoading(false);
+      if (agentsRes.success) setAgents(agentsRes.data as AgentType[]);
+      if (providersRes.success)
+        setProviders(providersRes.data as InsuranceProviderType[]);
+      if (vehiclesRes.success)
+        setVehicleClasses(vehiclesRes.data as VehicleType[]);
+    } catch (error) {
+      console.error("Error loading form data:", error);
+      toast.error("Failed to load form data");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const calculateCommissions = (values: any) => {
@@ -70,16 +78,21 @@ const PolicyHolderForm = (
     const tdsRate = values.tdsRate || 0;
     const gstRate = values.gstRate || 0;
 
-    const totalCommission = (premiumAmount * (agentRate + ourRate)) / 100;
+    // totalCommission should be stored as a PERCENTAGE (rate), not as an amount
+    // It's the sum of agentRate + ourRate
+    const totalCommission = agentRate + ourRate;
+    
+    // Calculate commission amount using the totalCommission rate
+    const commission = (premiumAmount * totalCommission) / 100;
     const agentCommission = (premiumAmount * agentRate) / 100;
     const ourProfit = (premiumAmount * ourRate) / 100;
-    const tdsAmount = (ourProfit * tdsRate) / 100;
+    const tdsAmount = (commission * tdsRate) / 100;
     const gstAmount = (premiumAmount * gstRate) / 100;
-    const profitAfterTDS = ourProfit - tdsAmount;
+    const profitAfterTDS = commission - tdsAmount;
     const grossAmount = premiumAmount + gstAmount;
 
     return {
-      totalCommission,
+      totalCommission, // Stored as percentage rate (e.g., 3.5 for 3.5%)
       agentCommission,
       ourProfit,
       tdsAmount,
@@ -91,6 +104,19 @@ const PolicyHolderForm = (
 
   const handleSavePolicy = async (values: any) => {
     try {
+      // Include id in validation data for Edit mode
+      const validationData = props.data.mode === "Edit" && props.data.policy?.id
+        ? { ...values, id: props.data.policy.id }
+        : values;
+
+      // Validate data
+      const validation = validatePolicyHolder(validationData, props.data.mode);
+      if (!validation.isValid) {
+        const firstError = Object.values(validation.errors)[0];
+        toast.error(firstError);
+        return;
+      }
+
       // Calculate commissions
       const calculations = calculateCommissions(values);
 
@@ -103,17 +129,15 @@ const PolicyHolderForm = (
         endDate: values.endDate
           ? dayjs(values.endDate).toISOString()
           : new Date().toISOString(),
-        status: "active",
       };
 
       if (props.data.mode === "Edit" && props.data.policy?.id) {
-        const result = await FirestoreService.update(
-          COLLECTIONS.POLICY_HOLDERS,
+        const result = await PolicyHolderService.update(
           props.data.policy.id,
           policyData
         );
         if (result.success) {
-          toast.success("Policy updated successfully");
+          toast.success(result.message || "Policy updated successfully");
           dispatch(updatePolicy({ ...policyData, id: props.data.policy.id }));
           props.form.resetFields();
           if (props.onClose) props.onClose();
@@ -121,12 +145,9 @@ const PolicyHolderForm = (
           toast.error(result.error || "Failed to update policy");
         }
       } else {
-        const result = await FirestoreService.create(
-          COLLECTIONS.POLICY_HOLDERS,
-          policyData
-        );
+        const result = await PolicyHolderService.create(policyData);
         if (result.success) {
-          toast.success("Policy created successfully");
+          toast.success(result.message || "Policy created successfully");
           dispatch(addPolicy(result.data as PolicyHoldersType));
           props.form.resetFields();
           if (props.onClose) props.onClose();

@@ -17,6 +17,7 @@ import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { signOut } from "@/client/utils/firebase/firebase-auth-helpers";
 import ThemeSelector from "@/client/components/common/ThemeSelector";
+import Image from "next/image";
 
 const { Header, Sider, Content } = Layout;
 
@@ -94,7 +95,7 @@ export default function DashboardLayout({
   ];
 
   return (
-    <Layout className="min-h-screen" style={{ background: "#fafafa" }}>
+    <Layout className="min-h-screen" style={{ background: "#fafafa", height: "100vh" }}>
       <Sider
         trigger={null}
         collapsible
@@ -107,10 +108,34 @@ export default function DashboardLayout({
         style={{
           background: "#ffffff",
           borderRight: "1px solid #f0f0f0",
+          height: "100vh",
+          position: "fixed",
+          left: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: "auto",
         }}
       >
-        <div className="text-center py-5 font-bold text-base border-b border-gray-100" style={{ color: "#93674d" }}>
-          {collapsed ? "DRC" : "Dev Rudra Consultancy"}
+        <div className="flex justify-center items-center py-5 border-b border-gray-100">
+          {collapsed ? (
+            <Image
+              src="/favicon.ico"
+              alt="DRC"
+              width={40}
+              height={40}
+              className="object-contain"
+              priority
+            />
+          ) : (
+            <Image
+              src="/logo.png"
+              alt="Dev Rudra Consultancy"
+              width={180}
+              height={60}
+              className="object-contain"
+              priority
+            />
+          )}
         </div>
         <Menu
           mode="inline"
@@ -125,7 +150,7 @@ export default function DashboardLayout({
           className="custom-sidebar-menu-light"
         />
       </Sider>
-      <Layout style={{ background: "#fafafa" }}>
+      <Layout style={{ background: "#fafafa", marginLeft: collapsed ? 80 : 200, minHeight: "100vh" }}>
         <Header 
           className="px-6 flex justify-between items-center"
           style={{
@@ -156,7 +181,7 @@ export default function DashboardLayout({
             </Dropdown>
           </div>
         </Header>
-        <Content className="m-6 p-6 bg-white rounded-lg" style={{ boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02)" }}>
+        <Content className="m-6 p-6 bg-white rounded-lg" style={{ boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02)", minHeight: "calc(100vh - 64px - 48px)" }}>
           {children}
         </Content>
       </Layout>
